@@ -250,6 +250,7 @@ userinit(void)
   p->cwd = namei("/");
 
   p->state = RUNNABLE;
+  p->traced = 0;
 
   release(&p->lock);
 }
@@ -295,6 +296,8 @@ fork(void)
     return -1;
   }
   np->sz = p->sz;
+
+  np->traced = p->traced;
 
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
