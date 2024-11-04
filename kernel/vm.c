@@ -262,8 +262,14 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz, int xperm)
 
   oldsz = PGROUNDUP(oldsz);
   for(a = oldsz; a < newsz; a += sz){
-    sz = PGSIZE;
-    mem = kalloc();
+    if(SUPERPGROUNDUP(a) == a && a +SUPERPGSIZE <= newsz){
+      sz = SUPERPGSIZE;
+      mem = superalloc();
+    }
+    else{
+      sz = PGSIZE;
+      mem = kalloc();
+    }
     if(mem == 0){
       uvmdealloc(pagetable, a, oldsz);
       return 0;
