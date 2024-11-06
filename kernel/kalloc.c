@@ -21,12 +21,18 @@ struct run {
 struct {
   struct spinlock lock;
   struct run *freelist;
+  int usermemcnt[(PHYSTOP-KERNBASE)/PGSIZE];
 } kmem;
 
 void
 kinit()
 {
   initlock(&kmem.lock, "kmem");
+  acquire(&kmem.lock);
+  for(int i=0;i<(PHYSTOP-KERNBASE)/PGSIZE;i++){
+    kmem.usermemcnt[i] = 0;
+  }
+  release(&kmem.lock);
   freerange(end, (void*)PHYSTOP);
 }
 
@@ -51,14 +57,14 @@ kfree(void *pa)
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
 
-  // Fill with junk to catch dangling refs.
-  memset(pa, 1, PGSIZE);
-
-  r = (struct run*)pa;
-
+  int ind = ((uint64)pa-KERNBASE)/PGSIZE;
   acquire(&kmem.lock);
-  r->next = kmem.freelist;
-  kmem.freelist = r;
+  if(kmem.usermemcnt[ind]==0){
+    r = (struct run*)pa;
+    r->next = kmem.freelist;
+    kmem.freelist = r;
+    memset(pa, 1, PGSIZE);
+  }
   release(&kmem.lock);
 }
 
@@ -69,13 +75,22 @@ void *
 kalloc(void)
 {
   struct run *r;
-
+  printf("kalloc: hit here\n");
   acquire(&kmem.lock);
+  printf("kalloc: hit here\n");
   r = kmem.freelist;
-  if(r)
+  if(r){
+    printf("kalloc: hit here 2\n");
+    int ind = ((uint64)r - KERNBASE)/PGSIZE;
+    printf("kalloc: hit here 2\n");
     kmem.freelist = r->next;
+    printf("kalloc: hit here 2\n");
+    kmem.usermemcnt[ind] = 0;
+    printf("kalloc: hit here 2\n");
+  }
+  printf("kalloc: hit here\n");
   release(&kmem.lock);
-
+  printf("kalloc: hit here\n");
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
   return (void*)r;
