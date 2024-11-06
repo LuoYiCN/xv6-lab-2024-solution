@@ -8,7 +8,6 @@
 #include "spinlock.h"
 #include "riscv.h"
 #include "defs.h"
-
 void freerange(void *pa_start, void *pa_end);
 
 extern char end[]; // first address after kernel.
@@ -30,7 +29,7 @@ kinit()
   initlock(&kmem.lock, "kmem");
   acquire(&kmem.lock);
   for(int i=0;i<(PHYSTOP-KERNBASE)/PGSIZE;i++){
-    kmem.usermemcnt[i] = 0;
+    kmem.usermemcnt[i] = 1;
   }
   release(&kmem.lock);
   freerange(end, (void*)PHYSTOP);
@@ -59,11 +58,11 @@ kfree(void *pa)
 
   int ind = ((uint64)pa-KERNBASE)/PGSIZE;
   acquire(&kmem.lock);
+  kmem.usermemcnt[ind]--;
   if(kmem.usermemcnt[ind]==0){
     r = (struct run*)pa;
     r->next = kmem.freelist;
     kmem.freelist = r;
-    memset(pa, 1, PGSIZE);
   }
   release(&kmem.lock);
 }
@@ -75,23 +74,16 @@ void *
 kalloc(void)
 {
   struct run *r;
-  printf("kalloc: hit here\n");
   acquire(&kmem.lock);
-  printf("kalloc: hit here\n");
   r = kmem.freelist;
   if(r){
-    printf("kalloc: hit here 2\n");
     int ind = ((uint64)r - KERNBASE)/PGSIZE;
-    printf("kalloc: hit here 2\n");
     kmem.freelist = r->next;
-    printf("kalloc: hit here 2\n");
-    kmem.usermemcnt[ind] = 0;
-    printf("kalloc: hit here 2\n");
+    kmem.usermemcnt[ind] = 1;
   }
-  printf("kalloc: hit here\n");
   release(&kmem.lock);
-  printf("kalloc: hit here\n");
-  if(r)
+  if(r){
     memset((char*)r, 5, PGSIZE); // fill with junk
+  }
   return (void*)r;
 }

@@ -69,13 +69,19 @@ usertrap(void)
   else if(r_scause() == 0xf){
     uint64 va = r_stval();
     pte_t *pte = walk(p->pagetable,va,0);
+    if(pte==0){
+      setkilled(p);
+      exit(-1);
+    }
     uint64 pa = PTE2PA(*pte);
+    uint flags = PTE_FLAGS(*pte);
     if(*pte & PTE_C){
+      flags &= ~PTE_C;
       void *mem = kalloc();
       if(mem){
-        uvmunmap(p->pagetable,va,1,0);
-        mappages(p->pagetable,va,PGSIZE,(uint64)mem,PTE_U|PTE_R|PTE_W);
         memmove(mem,(void*)pa,PGSIZE);
+        kfree((void*)pa);
+        *pte = PA2PTE((uint64)mem) | PTE_V | PTE_W | PTE_U | PTE_R;
       }
       else{
         setkilled(p);
